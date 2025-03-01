@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Generated Passes</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="header no-print">
+        <h1>Generated Passes</h1>
+        <p>View and print the generated passes for {{ guest.name }}</p>
+    </div>
+    
+    {% for category, message in get_flashed_messages(with_categories=true) %}
+    <div class="alert alert-{{ category }} no-print">
+        {{ message }}
+    </div>
+    {% endfor %}
+    
+    <div class="info-card no-print">
+        <h2>Guest Information</h2>
+        <div class="info-row">
+            <div class="info-label">Pass Type:</div>
+            <div class="info-value">{{ guest.pass_type }}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">ID:</div>
+            <div class="info-value">{{ guest.unique_id }}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Name:</div>
+            <div class="info-value">{{ guest.name }}</div>
+        </div>
+        <div class="info-row">
+            <div class="info-label">Gender:</div>
+            <div class="info-value">{{ guest.gender }}</div>
+        </div>
+        {% if guest.designation %}
+        <div class="info-row">
+            <div class="info-label">Designation:</div>
+            <div class="info-value">{{ guest.designation }}</div>
+        </div>
+        {% endif %}
+        {% if guest.recommended_by %}
+        <div class="info-row">
+            <div class="info-label">Recommended By:</div>
+            <div class="info-value">{{ guest.recommended_by }}</div>
+        </div>
+        {% endif %}
+        {% if guest.car_number %}
+        <div class="info-row">
+            <div class="info-label">Car Number:</div>
+            <div class="info-value">{{ guest.car_number }}</div>
+        </div>
+        {% endif %}
+        {% if guest.contact_number %}
+        <div class="info-row">
+            <div class="info-label">Contact:</div>
+            <div class="info-value">{{ guest.contact_number }}</div>
+        </div>
+        {% endif %}
+        
+        {% if guest.accompanying_persons %}
+        <h3>Accompanying Persons</h3>
+        <ul>
+            {% for person in guest.accompanying_persons %}
+            <li>{{ person.name }} ({{ person.gender }})</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </div>
+    
+    <div class="passes-section">
+        <div class="pass-tabs no-print">
+            <button class="pass-tab active" onclick="showPass('personalPass')">Personal Pass</button>
+            {% if car_pass_file %}
+            <button class="pass-tab" onclick="showPass('carPass')">Car Pass</button>
+            {% endif %}
+            {% for person in accompanying_passes %}
+            <button class="pass-tab" onclick="showPass('personPass{{ loop.index }}')">{{ person.name }}</button>
+            {% endfor %}
+        </div>
+        
+        <div class="pass-container">
+            <div id="personalPass" class="pass-content">
+                <iframe class="pass-frame" src="{{ personal_pass_file }}"></iframe>
+            </div>
+            
+            {% if car_pass_file %}
+            <div id="carPass" class="pass-content" style="display: none;">
+                <iframe class="pass-frame" src="{{ car_pass_file }}"></iframe>
+            </div>
+            {% endif %}
+            
+            {% for person in accompanying_passes %}
+            <div id="personPass{{ loop.index }}" class="pass-content" style="display: none;">
+                <iframe class="pass-frame" src="{{ person.file }}"></iframe>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div class="action-buttons no-print">
+            <a href="{{ url_for('download_pass', unique_id=guest.unique_id, pass_type='personal') }}" class="btn">Download Personal Pass</a>
+            {% if car_pass_file %}
+            <a href="{{ url_for('download_pass', unique_id=guest.unique_id, pass_type='car') }}" class="btn">Download Car Pass</a>
+            {% endif %}
+            {% for i in range(guest.accompanying_persons|length) %}
+            <a href="{{ url_for('download_pass', unique_id=guest.unique_id, pass_type='person_' + (i+1)|string) }}" class="btn">Download {{ guest.accompanying_persons[i].name }} Pass</a>
+            {% endfor %}
+            <button onclick="window.print()" class="btn">Print Current Pass</button>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Create New Pass</a>
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-secondary">Admin Dashboard</a>
+        </div>
+    </div>
+    
+    <script>
+        function showPass(passId) {
+            // Hide all pass content
+            const passContents = document.querySelectorAll('.pass-content');
+            passContents.forEach(content => {
+                content.style.display = 'none';
+            });
+            
+            // Show selected pass content
+            document.getElementById(passId).style.display = 'block';
+            
+            // Update active tab
+            document.querySelectorAll('.pass-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Find the tab that was clicked and add active class
+            const tabs = document.querySelectorAll('.pass-tab');
+            for (let i = 0; i < tabs.length; i++) {
+                if (tabs[i].textContent.includes(passId.replace('Pass', '')) || 
+                    (passId === 'personalPass' && i === 0) ||
+                    (passId === 'carPass' && i === 1)) {
+                    tabs[i].classList.add('active');
+                    break;
+                }
+            }
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Make sure the first tab is shown
+            showPass('personalPass');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIP/VVIP Pass Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="header">
+        <h1>VIP/VVIP Pass Generator</h1>
+        <p>Create and manage passes for special guests</p>
+    </div>
+    
+    {% for category, message in get_flashed_messages(with_categories=true) %}
+    <div class="alert alert-{{ category }}">
+        {{ message }}
+    </div>
+    {% endfor %}
+    
+    <div class="form-container">
+        <form id="passForm" action="{{ url_for('generate_pass') }}" method="POST">
+            <div class="form-section">
+                <h2>Pass Information</h2>
+                <div class="row">
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="passType">Pass Type:</label>
+                            <div class="radio-group">
+                                <div class="radio-item">
+                                    <input type="radio" id="vip" name="passType" value="VIP" checked>
+                                    <label for="vip">VIP</label>
+                                </div>
+                                <div class="radio-item">
+                                    <input type="radio" id="vvip" name="passType" value="VVIP">
+                                    <label for="vvip">VVIP</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="uniqueId">Unique ID:</label>
+                            <input type="text" id="uniqueId" name="uniqueId" value="{{ next_id }}" readonly>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h2>Primary Guest Information</h2>
+                <div class="row">
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="guestName">Full Name:</label>
+                            <input type="text" id="guestName" name="guestName" required>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="gender">Gender:</label>
+                            <select id="gender" name="gender" required>
+                                <option value="">Select Gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="designation">Designation:</label>
+                            <input type="text" id="designation" name="designation" required>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="recommendedBy">Recommended By:</label>
+                            <input type="text" id="recommendedBy" name="recommendedBy" required>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="carNumber">Car Number (if applicable):</label>
+                            <input type="text" id="carNumber" name="carNumber">
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="contactNumber">Contact Number:</label>
+                            <input type="text" id="contactNumber" name="contactNumber" required>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h2>Accompanying Persons</h2>
+                <div class="form-group">
+                    <label for="numPersons">Number of Accompanying Persons:</label>
+                    <input type="number" id="numPersons" name="numPersons" min="0" max="10" value="0" onchange="updateAccompanyingPersons()">
+                </div>
+                
+                <div id="accompanyingPersons" class="accompanying-persons">
+                    <!-- Dynamic content will be added here -->
+                    <p id="noPersonsMessage">No accompanying persons added.</p>
+                </div>
+                
+                <button type="button" class="add-person" onclick="addPerson()">+ Add Person</button>
+            </div>
+            
+            <button type="submit" class="submit-btn">Generate Pass</button>
+        </form>
+    </div>
+    
+    <div class="preview-section">
+        <h2>Pass Preview</h2>
+        <div class="tabs">
+            <button class="tab active" onclick="showPreview('guestPass')">Guest Pass</button>
+            <button class="tab" onclick="showPreview('carPass')">Car Pass</button>
+        </div>
+        <div id="previewContainer" class="preview-container">
+            <!-- Pass preview will be shown here -->
+            <p>Select pass type and fill information to see preview</p>
+        </div>
+    </div>
+    
+    <script>
+        let personCount = 0;
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up event listeners for form changes
+            document.getElementById('passForm').addEventListener('change', updatePreview);
+            document.querySelectorAll('input[name="passType"]').forEach(radio => {
+                radio.addEventListener('change', updatePreview);
+            });
+            
+            // Generate initial preview
+            updatePreview();
+        });
+        
+        function updateAccompanyingPersons() {
+            const numPersons = parseInt(document.getElementById('numPersons').value);
+            const container = document.getElementById('accompanyingPersons');
+            const noPersonsMessage = document.getElementById('noPersonsMessage');
+            
+            // Clear existing entries if number is reduced
+            const existingEntries = container.querySelectorAll('.person-entry');
+            if (existingEntries.length > numPersons) {
+                for (let i = numPersons; i < existingEntries.length; i++) {
+                    container.removeChild(existingEntries[i]);
+                }
+            }
+            
+            // Add new entries if number is increased
+            for (let i = existingEntries.length; i < numPersons; i++) {
+                addPerson();
+            }
+            
+            // Show/hide no persons message
+            if (numPersons > 0) {
+                if (noPersonsMessage) noPersonsMessage.style.display = 'none';
+            } else {
+                if (noPersonsMessage) noPersonsMessage.style.display = 'block';
+            }
+            
+            updatePreview();
+        }
+        
+        function addPerson() {
+            personCount++;
+            const container = document.getElementById('accompanyingPersons');
+            const noPersonsMessage = document.getElementById('noPersonsMessage');
+            
+            if (noPersonsMessage) {
+                noPersonsMessage.style.display = 'none';
+            }
+            
+            const personDiv = document.createElement('div');
+            personDiv.className = 'person-entry';
+            personDiv.innerHTML = `
+                <button type="button" class="remove-person" onclick="removePerson(this)">×</button>
+                <div class="row">
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="personName${personCount}">Full Name:</label>
+                            <input type="text" id="personName${personCount}" name="personName[]" required>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="form-group">
+                            <label for="personGender${personCount}">Gender:</label>
+                            <select id="personGender${personCount}" name="personGender[]" required>
+                                <option value="">Select Gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            container.appendChild(personDiv);
+            
+            // Update number input
+            const numPersons = document.getElementById('numPersons');
+            numPersons.value = container.querySelectorAll('.person-entry').length;
+            
+            updatePreview();
+        }
+        
+        function removePerson(button) {
+            const personEntry = button.parentNode;
+            const container = personEntry.parentNode;
+            
+            container.removeChild(personEntry);
+            
+            // Update number input
+            const numPersons = document.getElementById('numPersons');
+            const newCount = container.querySelectorAll('.person-entry').length;
+            numPersons.value = newCount;
+            
+            // Show "no persons" message if needed
+            if (newCount === 0) {
+                const noPersonsMessage = document.getElementById('noPersonsMessage');
+                if (!noPersonsMessage) {
+                    const message = document.createElement('p');
+                    message.id = 'noPersonsMessage';
+                    message.textContent = 'No accompanying persons added.';
+                    container.appendChild(message);
+                } else {
+                    noPersonsMessage.style.display = 'block';
+                }
+            }
+            
+            updatePreview();
+        }
+        
+        function updatePreview() {
+            const passType = document.querySelector('input[name="passType"]:checked').value;
+            const previewContainer = document.getElementById('previewContainer');
+            const guestName = document.getElementById('guestName').value || 'Guest Name';
+            const gender = document.getElementById('gender').value || 'Male';
+            
+            // Get background color based on pass type
+            const bgColor = passType === 'VIP' ? '#6BC45A' : (passType === 'VVIP' ? '#FF8800' : '#6BC45A');
+            const passTypeText = passType === 'VIP' ? 'VIP' : 'VVIP';
+            
+            // Create guest pass preview
+            const previewHTML = `
+                <div style="max-width: 400px; margin: 0 auto; background-color: ${bgColor}; border: 2px solid black; padding: 15px; color: black;">
+                    <div style="display: flex; background-color: white; padding: 10px; margin-bottom: 10px; border: 1px solid black;">
+                        <div style="width: 50px; height: 50px; background-color: black; color: white; display: flex; justify-content: center; align-items: center; margin-right: 10px; font-weight: bold;">
+                            RS<br>SB
+                        </div>
+                        <div>
+                            <h3 style="font-size: 14px; margin: 0;">RADHA SOAMI SATSANG BEAS, JAMMU</h3>
+                            <h3 style="font-size: 14px; margin: 0;">SATSANG PROGRAMME 6<sup>th</sup> & 7<sup>th</sup> April, 2024</h3>
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: center; margin-bottom: 10px; font-weight: bold;">
+                        S.NO: ${document.getElementById('uniqueId').value}
+                    </div>
+                    
+                    <div style="text-align: center; width: 120px; margin: 10px auto; background-color: white; border: 2px solid red; padding: 5px; font-weight: bold;">
+                        ${gender === 'Male' ? 'GENTS' : 'LADIES'}
+                    </div>
+                    
+                    <div style="text-decoration: underline; font-weight: bold; margin: 10px 0;">
+                        6th April 2024 (SATURDAY)
+                    </div>
+                    
+                    <div style="margin: 10px 0;">
+                        ${guestName}
+                    </div>
+                    
+                    <div style="text-decoration: underline; font-weight: bold; margin: 10px 0;">
+                        7th April 2024 (SUNDAY)
+                    </div>
+                    
+                    <div style="font-size: 12px; margin-top: 20px;">
+                        <div>NOTES:</div>
+                        <ol style="margin-left: 20px;">
+                            <li>Please bring your ID card along with this pass.</li>
+                            <li>No electronic devices, mobile phones, smart watch, arms/weapons allowed.</li>
+                            <li>This pass is non-transferable.</li>
+                            <li>Incase of any need, please contact at 8082039255.</li>
+                            <li>Entry Closes: 9:00 AM  Satsang time: 9:30 AM</li>
+                        </ol>
+                    </div>
+                    
+                    <div style="text-align: right; margin-top: 20px;">
+                        Auth. Signatory
+                    </div>
+                </div>
+            `;
+            
+            previewContainer.innerHTML = previewHTML;
+        }
+        
+        function showPreview(previewType) {
+            // Update tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Show selected preview
+            if (previewType === 'guestPass') {
+                updatePreview();
+            } else if (previewType === 'carPass') {
+                const passType = document.querySelector('input[name="passType"]:checked').value;
+                const carNumber = document.getElementById('carNumber').value || 'XX-XX-XXXX';
+                
+                // Get background color based on pass type
+                const bgColor = passType === 'VIP' ? '#6BC45A' : (passType === 'VVIP' ? '#FFCC00' : '#6BC45A');
+                const carNumberColor = passType === 'VIP' ? 'blue' : 'red';
+                
+                const carPreviewHTML = `
+                    <div style="max-width: 600px; margin: 0 auto; background-color: ${bgColor}; border: 2px solid black; padding: 15px; color: black;">
+                        <div style="display: flex; justify-content: center; background-color: white; padding: 10px; margin-bottom: 10px; border: 1px solid black;">
+                            <div style="width: 50px; height: 50px; background-color: black; color: white; display: flex; justify-content: center; align-items: center; margin-right: 10px; font-weight: bold;">
+                                RS<br>SB
+                            </div>
+                            <div>
+                                <h3 style="font-size: 14px; margin: 0;">RADHA SOAMI SATSANG BEAS, JAMMU</h3>
+                                <h3 style="font-size: 14px; margin: 0;">SATSANG PROGRAMME 6<sup>th</sup> & 7<sup>th</sup> April, 2024</h3>
+                            </div>
+                        </div>
+                        
+                        <div style="position: relative; padding: 20px;">
+                            <div style="font-weight: bold;">
+                                SNO: ${document.getElementById('uniqueId').value}
+                            </div>
+                            
+                            <div style="width: 200px; height: 100px; margin: 20px auto; position: relative; border: 3px solid black; border-radius: 50px 50px 0 0; display: flex; justify-content: center; align-items: center;">
+                                <div style="position: absolute; width: 40px; height: 40px; border: 3px solid black; border-radius: 50%; bottom: -20px; left: 30px;"></div>
+                                <div style="position: absolute; width: 40px; height: 40px; border: 3px solid black; border-radius: 50%; bottom: -20px; right: 30px;"></div>
+                                <div style="color: ${carNumberColor}; font-weight: bold; font-size: 24px;">P - 2024</div>
+                            </div>
+                            
+                            <div style="text-align: right; margin-top: 40px;">
+                                Auth. Signatory
+                            </div>
+                        </div>
+                        
+                        <div style="background-color: white; text-align: center; padding: 10px; font-weight: bold; margin-top: 10px; border: 1px solid black;">
+                            THIS CAR STICKER IS TO BE PASTED ON WINDSHIELD
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('previewContainer').innerHTML = carPreviewHTML;
+            }
+        }
+    </script>
+</body>
+</html>
